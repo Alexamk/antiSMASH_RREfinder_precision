@@ -124,10 +124,47 @@ def build_hits(record: Record, hmmscan_results: List, min_score: float,
                    "description": hsp.hit_description, "protein_start": hsp.query_start, "protein_end": hsp.query_end}
             hits.append(hit)
     return hits
+    
+def build_hits_copy(record: Record, hmmscan_results: List, min_score: float,
+               max_evalue: float, min_length: int, database: str) -> List[Dict[str, Any]]:
+    # Removed the get_pfam_id_from_name as the RRE databases do not have Pfam IDs
+    """ Builds PFAMDomains from the given hmmscan results
+
+        Arguments:
+            record: the Record being scanned
+            hmmscan_results: the results of Bio.SearchIO.parse
+            min_score: a minimum allowable bitscore for hits (exclusive)
+            max_evalue: a maximum allowable evalue for hits (exclusive)
+            database: the name of the database used to find the hits
+
+        Returns:
+            a list of JSON representations of hmmer hits
+    """
+    logging.debug("Generating feature objects for PFAM hits")
+
+    hits = []
+    feature_by_id = record.get_cds_name_mapping()
+
+    for result in hmmscan_results:
+        for hsp in result.hsps:
+            if hsp.bitscore <= min_score or hsp.evalue >= max_evalue:
+                continue
+
+            feature = feature_by_id[hsp.query_id]
+            location = feature.get_sub_location_from_protein_coordinates(hsp.query_start, hsp.query_end)
+            
+            hit = {"location": str(location),
+                   "label": result.id, "locus_tag": feature.get_name(),
+                   "domain": hsp.hit_id, "evalue": hsp.evalue, "score": hsp.bitscore,
+                   "translation": feature.translation[hsp.query_start:hsp.query_end + 1],
+                   "description": hsp.hit_description, "protein_start": hsp.query_start, "protein_end": hsp.query_end}
+            hits.append(hit)
+    return hits
 
 
 def run_hmmer(record: Record, features: Iterable[CDSFeature], max_evalue: float,
               min_score: float, database: str, tool: str) -> HmmerResults:
+    # Removed the --cut_tc option as the RRE models do not have trusted cutoffs
     """ Build hmmer results for the given features
 
         Arguments:
@@ -143,6 +180,25 @@ def run_hmmer(record: Record, features: Iterable[CDSFeature], max_evalue: float,
     query_sequence = fasta.get_fasta_from_features(features)
     hmmscan_results = subprocessing.run_hmmscan(database, query_sequence, opts=["--cut_tc"])
     hits = build_hits(record, hmmscan_results, min_score, max_evalue, database)
+    return HmmerResults(record.id, max_evalue, min_score, database, tool, hits)
+    
+def run_hmmer_copy(record: Record, features: Iterable[CDSFeature], max_evalue: float,
+              min_score: float, min_length: int, database: str, tool: str) -> HmmerResults:
+    """ Build hmmer results for the given features
+
+        Arguments:
+            record: the Record instance to run hmmer over
+            features: the list of CDSFeatures to run over specifically
+            max_evalue: a maximum evalue allowed for hits (exclusive)
+            min_evalue: a minimum evalue allowed for hits (exclusive)
+            database: the database to search for hits within
+            tool: the name of the specific tool calling into this module
+    """
+    if not os.path.exists(database):
+        raise ValueError("Given database does not exist: %s" % database)
+    query_sequence = fasta.get_fasta_from_features(features)
+    hmmscan_results = subprocessing.run_hmmscan(database, query_sequence) # Removed the --cut_tc
+    hits = build_hits_copy(record, hmmscan_results, min_score, max_evalue, min_length, database)
     return HmmerResults(record.id, max_evalue, min_score, database, tool, hits)
 
 
