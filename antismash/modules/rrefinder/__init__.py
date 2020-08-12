@@ -24,8 +24,8 @@ from .rrefinder import run_rrefinder, RREFinderResults
 
 # then any local file imports, e.g. from .somefile import..., if relevant
 
-NAME = "the_name_of_your_module"
-SHORT_DESCRIPTION = "a short description of the module"
+NAME = "rrefinder"
+SHORT_DESCRIPTION = "Module for the pHMM-based detection of RiPP Recognition Elements (RREs)"
 
 
 # define a results class, this is important as adding information to the record
@@ -41,23 +41,28 @@ def get_arguments() -> ModuleArgs:
     """
     # construct the argument group, with section and prefix
     # the prefix will be enforced for all command line options for the module
-    args = ModuleArgs('Additional analysis', 'rrefinder')
+    args = ModuleArgs('Additional analysis', 'rre')
 
     # an example toggle to turn on your analysis, if not set to always be enabled
     # can also be used to turn on/off extra features of your analysis
-    args.add_analysis_toggle('--run',     # the option as it appears on the command line
-                             dest='rrefinder',  # the storage location in the antismash Config object
+    args.add_analysis_toggle('run',     # the option as it appears on the command line
+                             dest='run',  # the storage location in the antismash Config object
                              default=False,             # disabled by default
                              action='store_true',       # enabled if --template-analysis is given on the commandline
                              # and finally, text to show when the user runs with --help
                              help="Run RREFinder precision mode on all RiPP gene clusters.")
 
     # an example option setting a specific value
-    args.add_option('--cutoff',     # the option as it appears on the command line
-                    dest='rrefinder_cutoff',  # as it appears in the antismash Config object
+    args.add_option('cutoff',     # the option as it appears on the command line
+                    dest='cutoff',  # as it appears in the antismash Config object
                     type=float,              # the type of the option (int, str, float, ...)
                     default=25.0,            # the default value of the option
                     help="Bitscore cutoff for RRE pHMM detection.")
+    args.add_option('min_length',
+                    dest='min_length',
+                    type=int,
+                    default=50,
+                    help='Minimum amino acid length of RRE domains.')
     # more complicated options are possible, for further information see antismash.config.args,
     # look at how other modules construct arguments, or ask for help
     return args
@@ -75,8 +80,8 @@ def check_options(options: ConfigType) -> List[str]:
     issues = []
     # test the options used in get_arguments here, if any
     # for example, enforcing that values are within a certain range
-    if options.rrefinder_cutoff <= 0:
-        issues.append("Supplied RREFinder cutoff is negative: %s" % options.rrefinder_cutoff)
+    if options.rre_cutoff <= 0:
+        issues.append("Supplied RREFinder cutoff is negative: %s" % options.rre_cutoff)
     return issues
 
 
@@ -106,7 +111,7 @@ def is_enabled(options: ConfigType) -> bool:
     """
     # the logic here depends on which command options you've created
     # using the example above, this is as simple as returning the toggle
-    return options.rrefinder
+    return options.rre_run
 
 
 def regenerate_previous_results(previous: Dict[str, Any], record: Record,
@@ -125,7 +130,7 @@ def regenerate_previous_results(previous: Dict[str, Any], record: Record,
     # if there isn't anything to work with, just return None
     if not previous:
         return None
-    return RREFinderResults.from_json(previous, record)
+    return RREFinderResults.from_json(previous, record, options.rre_min_length, options.rre_cutoff)
 
 
 def run_on_record(record: Record, results: RREFinderResults, options: ConfigType) -> RREFinderResults:
@@ -143,7 +148,7 @@ def run_on_record(record: Record, results: RREFinderResults, options: ConfigType
     if isinstance(results, RREFinderResults) and results.record_id == record.id:
         return results
     # otherwise run the actual analysis and generate a results instance with your analysis results
-    results = run_rrefinder(record, options.rrefinder_cutoff)
+    results = run_rrefinder(record, options.rre_cutoff, options.rre_min_length)
     
     
     # and return it
