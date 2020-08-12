@@ -24,11 +24,9 @@ def generate_html(region_layer: RegionLayer, results: RREFinderResults,
     """ Generates HTML output for the module """
     html = HTMLSections("rrefinder")
 
-    side_tooltip = ("A beautiful description.")
+    side_tooltip = ("RREfinder results sidepanel.")
     template = FileTemplate(path.get_full_path(__file__, "templates", "sidepanel.html"))
     
-#    region_hits = results.get_subset_hits_for_region(region_layer.region_feature)
-    
-    html.add_sidepanel_section("RREFinder", template.render(results=results, region=region_layer.region_feature, tooltip=side_tooltip),"RREfinder")
+    html.add_sidepanel_section("RREFinder", template.render(results=results, region=region_layer.region_feature, tooltip=side_tooltip), "RREfinder")
 
     return html
