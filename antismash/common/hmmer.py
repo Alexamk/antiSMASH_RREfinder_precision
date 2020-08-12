@@ -126,7 +126,7 @@ def build_hits(record: Record, hmmscan_results: List, min_score: float,
     return hits
     
 def build_hits_copy(record: Record, hmmscan_results: List, min_score: float,
-               max_evalue: float, min_length: int, database: str) -> List[Dict[str, Any]]:
+               max_evalue: float, database: str) -> List[Dict[str, Any]]:
     # Removed the get_pfam_id_from_name as the RRE databases do not have Pfam IDs
     """ Builds PFAMDomains from the given hmmscan results
 
@@ -183,7 +183,7 @@ def run_hmmer(record: Record, features: Iterable[CDSFeature], max_evalue: float,
     return HmmerResults(record.id, max_evalue, min_score, database, tool, hits)
     
 def run_hmmer_copy(record: Record, features: Iterable[CDSFeature], max_evalue: float,
-              min_score: float, min_length: int, database: str, tool: str) -> HmmerResults:
+              min_score: float, database: str, tool: str) -> HmmerResults:
     """ Build hmmer results for the given features
 
         Arguments:
@@ -198,7 +198,7 @@ def run_hmmer_copy(record: Record, features: Iterable[CDSFeature], max_evalue: f
         raise ValueError("Given database does not exist: %s" % database)
     query_sequence = fasta.get_fasta_from_features(features)
     hmmscan_results = subprocessing.run_hmmscan(database, query_sequence) # Removed the --cut_tc
-    hits = build_hits_copy(record, hmmscan_results, min_score, max_evalue, min_length, database)
+    hits = build_hits_copy(record, hmmscan_results, min_score, max_evalue, database)
     return HmmerResults(record.id, max_evalue, min_score, database, tool, hits)
 
 
