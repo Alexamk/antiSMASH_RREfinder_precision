@@ -17,4 +17,5 @@ from .pfam_domain import PFAMDomain
 from .prepeptide import Prepeptide
 from .protocluster import Protocluster
 from .region import Region
+from .rre_domain import RRE
 from .subregion import SubRegion
