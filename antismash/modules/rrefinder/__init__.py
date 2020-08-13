@@ -98,7 +98,7 @@ def check_prereqs(options: ConfigType) -> List[str]:
     # that external programs are available, and so on
     # see antismash.detection.hmm_detection for an example of these
     
-    hmm_database = path.get_full_path(__file__, 'data', 'RREFinder.hmm')
+    hmm_database = path.get_full_path(__file__, 'data', 'RREFam.hmm')
     hmm_present = ensure_database_pressed(hmm_database, return_not_raise=True)
     # Currently the only error
     
@@ -115,7 +115,7 @@ def is_enabled(options: ConfigType) -> bool:
 
 
 def regenerate_previous_results(previous: Dict[str, Any], record: Record,
-                                _options: ConfigType) -> Optional[RREFinderResults]:
+                                options: ConfigType) -> Optional[RREFinderResults]:
     """ Regenerate the previous results from JSON format.
 
         Arguments:
