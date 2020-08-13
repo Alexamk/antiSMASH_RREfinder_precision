@@ -114,12 +114,10 @@ def check_hmm_hit(hit: Dict[str, Any], min_length: int, bitscore_cutoff: float) 
 
 def run_rrefinder(record: Record, bitscore_cutoff: float, min_length: int) -> RREFinderResults:
     # Run hmmscan per protocluster and gather the hits
-    hmm_hits = hmmscan_rrefinder(record, bitscore_cutoff, min_length)
+    hmm_hits = run_hmmscan_rrefinder(record, bitscore_cutoff)
     # Filter the hits
     filtered_hits = filter_hits(hmm_hits, min_length, bitscore_cutoff)
     # Convert to RREFinderResults object
     RRE_results = RREFinderResults(record.id, bitscore_cutoff, min_length, filtered_hits)
-    # Temporary
-    logging.critical('Found hits in %i protoclusters.' %len(RRE_results.hits_per_protocluster))
 
     return RRE_results
