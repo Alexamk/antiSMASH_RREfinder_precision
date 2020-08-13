@@ -8,7 +8,7 @@
       <span><strong>{{cluster.product}} cluster</strong> ({{cluster.location.start}}...{{cluster.location.end}})</span>
       <dt></dt>
       {% set cluster_nr = cluster.get_protocluster_number() %}
-      {% set cluster_hits = results.hits[cluster_nr] %}
+      {% set cluster_hits = results.hits_per_protocluster[cluster_nr] %}
       {% for locus_tag, gene_hits in cluster_hits.items() %}
         <strong>{{locus_tag}}</strong> {{collapser_start(target=locus_tag, level='cds')}}
         {% for hit in gene_hits | sort(attribute='score', reverse=True)  %}
