@@ -13,6 +13,8 @@ from antismash.common import path
 from antismash.common.secmet import Region
 from antismash.common.secmet.features import Domain, Feature, FeatureLocation
 
+from antismash.common.secmet.locations import location_from_string
+
 class RREFinderResults(ModuleResults):
     """ Results class for the RREFinder analysis"""
     schema_version = 1  # when the data format in the results changes, this needs to be incremented
@@ -26,11 +28,30 @@ class RREFinderResults(ModuleResults):
         self.hits_per_protocluster = hits_per_protocluster
         self.features = [] # type: List[Feature] # features created for RREs
 
+    def convert_hits_to_features(self) -> None:
+        # Keep track of locus_tags already added
+        # In case a gene belonged to two overlapping protoclusters, features do not need to be added twice
+        locus_tags_added = set()
+
+        for protocluster_number, hits_per_locus_tag in self.hits_per_protocluster.items():
+            for locus_tag, hits in hits_per_locus_tag.items():
+                if locus_tag in locus_tags_added:
+                    continue
+                for hit in hits:
+                    location = location_from_string(hit['location'])
+                    rre_feature = Feature(location, feature_type="RRE_domain",
+                                      created_by_antismash=True)
+                    rre_feature.notes.append('%s within protein (%i..%i)' %(hit['domain'], hit['protein_start'], hit['protein_end']))
+                    self.features.append(rre_feature)
+                locus_tags_added.add(locus_tag)
+
     def add_to_record(self, record: Record) -> None:
         """ Adds the analysis results to the record """
         if record.id != self.record_id:
             raise ValueError("Record to store in and record analysed don't match")
-        raise NotImplementedError()  # remove this when completed
+
+        for feature in self.features:
+            record.add_feature(feature)
 
     def to_json(self) -> Dict[str, Any]:
         """ Constructs a JSON representation of this instance """
@@ -71,8 +92,9 @@ class RREFinderResults(ModuleResults):
 
         # Refilter the hits (in case the cutoff is now more stringent)
         filtered_hits = filter_hits(json['hits_per_protocluster'], min_length, bitscore_cutoff)
-
-        return RREFinderResults(record.id, bitscore_cutoff, min_length, filtered_hits)
+        RRE_results = RREFinderResults(record.id, bitscore_cutoff, min_length, filtered_hits)
+        RRE_results.convert_hits_to_features()
+        return RRE_results
 
 def is_ripp(product: str) -> bool:
     ripp_products = ['bacteriocin','cyanobactin','lanthipeptide',
@@ -108,9 +130,8 @@ def filter_hits(hits: Dict[int, Dict[str, List[Dict[str, Any]]]], min_length: in
     return filtered_hits
 
 def check_hmm_hit(hit: Dict[str, Any], min_length: int, bitscore_cutoff: float) -> Dict[str, Any]:
-    return (hit['protein_end'] - hit['protein_start'] + 1) >= min_length and (hit['score'] >= bitscore_cutoff)
-    # +1 to correct for normal (non-pythonic) indeces, which are used in biopython feature locations
-    # double check this to be sure
+    return (hit['protein_end'] - hit['protein_start']) >= min_length and (hit['score'] >= bitscore_cutoff)
+    # Locations come from BioPython's HSPs, so they are pythonic (zero-based, half-open)
 
 def run_rrefinder(record: Record, bitscore_cutoff: float, min_length: int) -> RREFinderResults:
     # Run hmmscan per protocluster and gather the hits
@@ -119,5 +140,5 @@ def run_rrefinder(record: Record, bitscore_cutoff: float, min_length: int) -> RR
     filtered_hits = filter_hits(hmm_hits, min_length, bitscore_cutoff)
     # Convert to RREFinderResults object
     RRE_results = RREFinderResults(record.id, bitscore_cutoff, min_length, filtered_hits)
-
+#    RRE_results.convert_hits_to_features()
     return RRE_results
