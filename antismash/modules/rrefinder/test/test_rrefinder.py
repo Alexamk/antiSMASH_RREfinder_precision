@@ -10,7 +10,7 @@ from unittest.mock import Mock, patch
 from antismash.common.test.helpers import DummyHMMResult, DummyRecord
 
 from antismash.common.hmmer import HmmerResults
-from antismash.common.secmet.features import Feature, FeatureLocation
+from antismash.common.secmet.features import RRE, Feature, FeatureLocation
 
 from antismash.modules.rrefinder.html_output import will_handle
 from antismash.modules.rrefinder.rrefinder import (
@@ -22,23 +22,28 @@ from antismash.modules.rrefinder.rrefinder import (
     run_rrefinder,
     )
 
-
 class TestRREResults(unittest.TestCase):
 
     def setUp(self):
         self.hit_a1 = {'locus_tag': 'locus_tag_a', 'location': '[1000:2000]',
-                        'label': 'a_generic_label', 'domain': 'RRE_type_A', 'evalue': 0.1,
+                        'label': 'a1_generic_label', 'domain': 'RRE_type_A', 'evalue': 0.1,
                         'protein_start': 0, 'protein_end': 50, 'score': 38.0,
+                        'description': 'description_type_A', 'translation': 'FAKESEQ',
                       }
         self.hit_b1 = {'locus_tag': 'locus_tag_b', 'location': '[500:1500]',
-                        'label': 'a_generic_label', 'domain': 'RRE_type_B', 'evalue': 0.2,
-                        'protein_start': 0, 'protein_end': 90, 'score': 25.0
+                        'label': 'b1_generic_label', 'domain': 'RRE_type_B', 'evalue': 0.2,
+                        'protein_start': 0, 'protein_end': 90, 'score': 25.0,
+                        'description': 'description_type_B', 'translation': 'FAKESEQ',
                         }
         self.filtered_hits = {1: {'locus_tag_a': [self.hit_a1],
                                     },
                                2: {'locus_tag_b': [self.hit_b1],
                                     },
                               }
+        self.tool = 'rrefinder'
+        self.database = 'RREFam.hmm'
+        self.detection = 'hmmscan'
+
         self.min_length = 50
         self.bitscore_cutoff = 25.0
 
@@ -56,7 +61,9 @@ class TestRREResults(unittest.TestCase):
                           "min_length": self.min_length,
                           "record_id": self.record_id, }
 
-    def make_features(self):
+        self.res_object = RREFinderResults.from_json(self.json_dict, self.record, self.min_length, self.bitscore_cutoff)
+
+    def make_features_old(self):
         floc1 = FeatureLocation(1000, 2000)
         floc2 = FeatureLocation(500, 1500)
         note1 = 'RRE_type_A within protein (0..50)'
@@ -69,52 +76,60 @@ class TestRREResults(unittest.TestCase):
         self.feature_locations = [floc1, floc2]
         self.feature_notes = [note1, note2]
 
+    def make_features(self):
+        floc = FeatureLocation(1000, 2000)
+        ploc = FeatureLocation(0, 50)
+        description = 'description_type_A'
+        domain = 'RRE_type_A'
+        locus_tag = 'locus_tag_a'
+        self.feature = RRE(floc, description, ploc, self.tool, locus_tag, domain)
+        domain_id = '{}_{}_{:04d}'.format(self.tool, locus_tag, 1)
+        self.feature.domain_id = domain_id
+
     def test_init(self):
-        res_object = RREFinderResults(self.record_id, self.bitscore_cutoff, self.min_length, self.filtered_hits)
-        assert res_object.record_id == self.record_id
-        assert res_object.bitscore_cutoff == self.bitscore_cutoff
-        assert res_object.min_length == self.min_length
-        assert res_object.hits_per_protocluster == self.filtered_hits
-        assert not res_object.features
+        assert self.res_object.record_id == self.record_id
+        assert self.res_object.bitscore_cutoff == self.bitscore_cutoff
+        assert self.res_object.min_length == self.min_length
+        assert self.res_object.hits_per_protocluster == self.filtered_hits
+        assert self.res_object.tool == self.tool
+        assert self.res_object.detection == self.detection
+        assert self.res_object.database == self.database
+        assert self.res_object.features
 
     def test_convert_hits_to_features(self):
-        res_object = RREFinderResults(self.record_id, self.bitscore_cutoff, self.min_length, self.filtered_hits)
-        res_object.convert_hits_to_features()
-        assert len(res_object.features) == 2
-        for feature in res_object.features:
-            assert isinstance(feature, Feature)
-            assert feature.location in self.feature_locations
-            assert feature.type == 'RRE_domain'
-            assert feature.created_by_antismash
-            assert feature.notes
-            assert feature.notes[0] in self.feature_notes
-
-        # Add an extra case where hit a1 is in both protoclusters
         filtered_hits = self.filtered_hits.copy()
-        filtered_hits[2]['locus_tag_a'] = self.hit_a1
+        _ = filtered_hits.pop(2)
         res_object = RREFinderResults(self.record_id, self.bitscore_cutoff, self.min_length, filtered_hits)
-        res_object.convert_hits_to_features()
-        assert len(res_object.features) == 2
-        for feature in res_object.features:
-            assert isinstance(feature, Feature)
-            assert feature.location in self.feature_locations
-            assert feature.type == 'RRE_domain'
-            assert feature.created_by_antismash
-            assert feature.notes
-            assert feature.notes[0] in self.feature_notes
+        assert len(res_object.features) == 1
+        feature = res_object.features[0]
+        assert isinstance(feature, RRE)
+        assert feature.location == self.feature.location
+        assert feature.protein_location == self.feature.protein_location
+        assert feature.domain_id == self.feature.domain_id
+        assert feature.database == self.database
+        assert feature.detection == self.detection
+        assert feature.score == self.hit_a1['score']
+        assert feature.evalue == self.hit_a1['evalue']
+        assert feature.label == self.hit_a1['label']
+        assert feature.translation == self.hit_a1['translation']
+
+        # An extra case where hit a1 is in both protoclusters
+        filtered_hits = self.filtered_hits.copy()
+        _ = filtered_hits[2].pop('locus_tag_b')
+        filtered_hits[2][self.hit_a1['locus_tag']] = [self.hit_a1]
+        res_object = RREFinderResults(self.record_id, self.bitscore_cutoff, self.min_length, filtered_hits)
+        assert len(res_object.features) == 1
 
     def test_to_json(self):
-        res_object = RREFinderResults(self.record_id, self.bitscore_cutoff, self.min_length, self.filtered_hits)
-        assert self.json_dict == res_object.to_json()
+        assert self.json_dict == self.res_object.to_json()
 
     def test_from_json(self):
-        res_object = RREFinderResults.from_json(self.json_dict, self.record, self.min_length, self.bitscore_cutoff)
-        assert res_object
-        assert res_object.hits_per_protocluster == self.filtered_hits
-        assert res_object.schema_version == RREFinderResults.schema_version
-        assert res_object.bitscore_cutoff == self.bitscore_cutoff
-        assert res_object.min_length == self.min_length
-        assert res_object.record_id == self.record_id
+        assert self.res_object
+        assert self.res_object.hits_per_protocluster == self.filtered_hits
+        assert self.res_object.schema_version == RREFinderResults.schema_version
+        assert self.res_object.bitscore_cutoff == self.bitscore_cutoff
+        assert self.res_object.min_length == self.min_length
+        assert self.res_object.record_id == self.record_id
 
         json_dict2 = dict(self.json_dict)
         json_dict2['record_id'] = 'another_record'
@@ -137,14 +152,14 @@ class TestRREResults(unittest.TestCase):
         res_object3 = RREFinderResults.from_json(self.json_dict, self.record, 80, self.bitscore_cutoff)
         assert res_object3.hits_per_protocluster == stricter_length_cutoff_hits
         
-#    def test_add_record(self):
-#        with self.assertRaisesRegex(ValueError, "Record to store in and record analysed don't match"):
-#            self.res_object.add_to_record(self.record2)
-#        self.res_object.add_to_record(self.record)
-#        assert self.record.add_feature.call_count == 2
-#        for arg in self.record.add_feature.call_args:
-#            assert isinstance(arg, Feature)
-#            assert arg in self.features
+    def test_add_record(self):
+        with self.assertRaisesRegex(ValueError, "Record to store in and record analysed don't match"):
+            self.res_object.add_to_record(self.record2)
+        self.res_object.add_to_record(self.record)
+        assert self.record.add_feature.call_count == 2
+        for arg in self.record.add_feature.call_args_list:
+            # First argument of positional arguments
+            assert isinstance(arg[0][0], RRE)
 
 class TestRREFinder(unittest.TestCase):
 
@@ -153,29 +168,32 @@ class TestRREFinder(unittest.TestCase):
              'lassopeptide','linaridin','thiopeptide','sactipeptide',
               'proteusin','glycocin','bottromycin','microcin']
 
-        self.hit_a1 = {'locus_tag': 'locus_tag_a', 'location': '1000-2000',
-                        'label': 'a_generic_label', 'domain': 'RRE_type_A', 'evalue': 0.1,
+        self.hit_a1 = {'locus_tag': 'locus_tag_a', 'location': '[1000:2000]',
+                        'label': 'a1_generic_label', 'domain': 'RRE_type_A', 'evalue': 0.1,
                         'protein_start': 0, 'protein_end': 50, 'score': 38.0,
-
+                        'description': 'description_type_A', 'translation': 'FAKESEQ',
+                      }
+        self.hit_a2 = {'locus_tag': 'locus_tag_a', 'location': '[1100:2100]',
+                        'label': 'a1_generic_label', 'domain': 'RRE_type_A', 'evalue': 0.1,
+                        'protein_start': 0, 'protein_end': 40, 'score': 38.0,
+                        'description': 'description_type_A', 'translation': 'FAKESEQ',
+                      }
+        self.hit_b1 = {'locus_tag': 'locus_tag_b', 'location': '[500:1500]',
+                        'label': 'b1_generic_label', 'domain': 'RRE_type_B', 'evalue': 0.2,
+                        'protein_start': 0, 'protein_end': 90, 'score': 25.0,
+                        'description': 'description_type_B', 'translation': 'FAKESEQ',
                         }
-        self.hit_a2 = {'locus_tag': 'locus_tag_a',
-                        'label': 'a_generic_label', 'domain': 'RRE_type_B', 'evalue': 0.1,
-                        'protein_start': 0, 'protein_end': 40, 'score': 38.0
+        self.hit_b2 = {'locus_tag': 'locus_tag_b', 'location': '[600:1600]',
+                        'label': 'b1_generic_label', 'domain': 'RRE_type_C', 'evalue': 0.2,
+                        'protein_start': 14, 'protein_end': 50, 'score': 42.0,
+                        'description': 'description_type_C', 'translation': 'FAKESEQ',
                         }
-        self.hit_b1 = {'locus_tag': 'locus_tag_b',
-                        'label': 'a_generic_label', 'domain': 'RRE_type_B', 'evalue': 0.2,
-                        'protein_start': 0, 'protein_end': 90, 'score': 25.0
-                        }
-        self.hit_b2 = {'locus_tag': 'locus_tag_b',
-                        'label': 'a_generic_label', 'domain': 'RRE_type_C', 'evalue': 0.2,
-                        'protein_start': 14, 'protein_end': 50, 'score': 42.0
-                        }
-
-        self.hit_c =  {'locus_tag': 'locus_tag_c',
+        self.hit_c =  {'locus_tag': 'locus_tag_c', 'location': '[200:400]',
                         'label': 'a_generic_label', 'domain': 'RRE_type_D', 'evalue': 0.2,
-                        'protein_start': 0, 'protein_end': 120, 'score': 6.0
+                        'protein_start': 0, 'protein_end': 120, 'score': 6.0,
+                        'description': 'description_type_D', 'translation': 'FAKESEQ',
                         }
-        
+
         self.unfiltered_hits = {1: {'locus_tag_a': [self.hit_a1, self.hit_a2],
                                       'locus_tag_c': [self.hit_c],
                                      },
