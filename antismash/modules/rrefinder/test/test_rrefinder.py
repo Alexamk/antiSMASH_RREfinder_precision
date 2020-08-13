@@ -89,6 +89,12 @@ class TestRREResults(unittest.TestCase):
         stricter_length_cutoff_hits = {2: {'locus_tag_b': [self.hit_b1],}, }
         res_object3 = RREFinderResults.from_json(self.json_dict, self.record, 80, self.bitscore_cutoff)
         assert res_object3.hits_per_protocluster == stricter_length_cutoff_hits
+        
+    def test_add_record(self):
+        record2 = Mock()
+        record2.record_id = 'another_record'
+        with self.assertRaisesRegex(ValueError, "Record to store in and record analysed don't match"):
+            self.res_object.add_to_record(record2) 
 
 class TestRREFinder(unittest.TestCase):
 
@@ -151,6 +157,7 @@ class TestRREFinder(unittest.TestCase):
         # can be retrieved in testing hmmscan
         region = Mock(name='my_region')
         record = Mock(name='my_record')
+        record.id = self.record_id
 
         protoclusters = []
         for protocluster_number in range(1,4):
@@ -199,6 +206,13 @@ class TestRREFinder(unittest.TestCase):
         hmm_results = run_hmmscan_rrefinder(self.mock_record, self.bitscore_cutoff)
         assert hmm_results == self.unfiltered_hits
 
-    def test_run_rrefinder(self):
-        pass
+    @patch('antismash.modules.rrefinder.rrefinder.run_hmmer_copy')
+    def test_run_rrefinder(self, mocked_function):
+        mocked_function.side_effect = self.return_hmm_results
+        res_object = run_rrefinder(self.mock_record, self.bitscore_cutoff, self.min_length)
+        assert res_object.record_id == self.record_id
+        assert res_object.hits_per_protocluster == self.filtered_hits
+        assert res_object.bitscore_cutoff == self.bitscore_cutoff
+        assert res_object.min_length == self.min_length
+        
 
