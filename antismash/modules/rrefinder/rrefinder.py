@@ -1,7 +1,7 @@
 import logging
 from collections import defaultdict
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 from antismash.common.secmet import Record
 from antismash.common.module_results import ModuleResults
@@ -11,7 +11,7 @@ from antismash.common.hmmer import run_hmmer_copy, HmmerResults
 from antismash.common import path
 
 from antismash.common.secmet import Region
-from antismash.common.secmet.features import Domain, Feature, FeatureLocation
+from antismash.common.secmet.features import Domain, Feature, FeatureLocation, RRE
 
 from antismash.common.secmet.locations import location_from_string
 
@@ -27,11 +27,14 @@ class RREFinderResults(ModuleResults):
         # All the hits per locus_tag, per protocluster ID
         self.hits_per_protocluster = hits_per_protocluster
         self.features = [] # type: List[Feature] # features created for RREs
+        self.tool = 'rrefinder'
+        self.database = 'RREFam.hmm'
+        self.detection = 'hmmscan'
+        self.convert_hits_to_features()
 
     def convert_hits_to_features(self) -> None:
-        # Keep track of locus_tags already added
-        # In case a gene belonged to two overlapping protoclusters, features do not need to be added twice
-        locus_tags_added = set()
+        locus_tags_added = set() # type: Set[str]
+        domain_counts = defaultdict(int) # type: Dict[str, int]
 
         for protocluster_number, hits_per_locus_tag in self.hits_per_protocluster.items():
             for locus_tag, hits in hits_per_locus_tag.items():
@@ -39,9 +42,19 @@ class RREFinderResults(ModuleResults):
                     continue
                 for hit in hits:
                     location = location_from_string(hit['location'])
-                    rre_feature = Feature(location, feature_type="RRE_domain",
-                                      created_by_antismash=True)
-                    rre_feature.notes.append('%s within protein (%i..%i)' %(hit['domain'], hit['protein_start'], hit['protein_end']))
+                    protein_location = FeatureLocation(hit['protein_start'], hit['protein_end'])
+                    rre_feature = RRE(location, hit['description'], protein_location, tool=self.tool,
+                                      locus_tag=locus_tag, domain=hit['domain'])
+                    # Set additional properties
+                    for attr in ['score', 'evalue', 'label', 'translation']:
+                        setattr(rre_feature, attr, hit[attr])
+
+                    rre_feature.database = self.database
+                    rre_feature.detection = self.detection
+
+                    domain_counts[hit['domain']] += 1  # 1-indexed, so increment before use
+                    rre_feature.domain_id = "{}_{}_{:04d}".format(self.tool, rre_feature.locus_tag, domain_counts[hit['domain']])
+
                     self.features.append(rre_feature)
                 locus_tags_added.add(locus_tag)
 
@@ -82,6 +95,10 @@ class RREFinderResults(ModuleResults):
         prev_min_length = json.get("min_length")
         prev_bitscore_cutoff = json.get("bitscore_cutoff")
 
+        if prev_min_length == None or prev_bitscore_cutoff == None:
+            raise ValueError('Invalid RREfinderResults json dictionary')
+        assert isinstance(prev_min_length, int) and isinstance(prev_bitscore_cutoff, float)
+
         # Check if the cutoff options set in this run are the same or stricter than in the previous run
         if bitscore_cutoff < prev_bitscore_cutoff:
             logging.debug("RREFinderResults bitscore cutoff has changed, discarding previous results")
@@ -93,7 +110,6 @@ class RREFinderResults(ModuleResults):
         # Refilter the hits (in case the cutoff is now more stringent)
         filtered_hits = filter_hits(json['hits_per_protocluster'], min_length, bitscore_cutoff)
         RRE_results = RREFinderResults(record.id, bitscore_cutoff, min_length, filtered_hits)
-        RRE_results.convert_hits_to_features()
         return RRE_results
 
 def is_ripp(product: str) -> bool:
@@ -102,9 +118,9 @@ def is_ripp(product: str) -> bool:
                       'proteusin','glycocin','bottromycin','microcin']
     return product in ripp_products
     
-def run_hmmscan_rrefinder(record: Record, bitscore_cutoff: float) -> Dict[int, List[Dict[str, Any]]]:
+def run_hmmscan_rrefinder(record: Record, bitscore_cutoff: float) -> Dict[int, Dict[str, List[Dict[str, Any]]]]:
     max_evalue = 1 # Mandatory argument for hmmscan, but hits are only filtered on score here
-    hmm_database = path.get_full_path(__file__, 'data', 'RREFinder.hmm')
+    hmm_database = path.get_full_path(__file__, 'data', 'RREFam.hmm')
     
     # Scan each CDS in each protocluster
     # This is somewhat redundant in the case of overlapping RiPP protoclusters,
@@ -140,5 +156,4 @@ def run_rrefinder(record: Record, bitscore_cutoff: float, min_length: int) -> RR
     filtered_hits = filter_hits(hmm_hits, min_length, bitscore_cutoff)
     # Convert to RREFinderResults object
     RRE_results = RREFinderResults(record.id, bitscore_cutoff, min_length, filtered_hits)
-#    RRE_results.convert_hits_to_features()
     return RRE_results
