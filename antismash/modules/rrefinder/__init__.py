@@ -1,17 +1,32 @@
 # License: GNU Affero General Public License v3 or later
 # A copy of GNU AGPL v3 should have been included in this software package in LICENSE.txt.
 
-""" Replace this text with a description of the module.
-    It can also include references for the method implemented.
+""" Implementation of RREFinder in antiSMASH.
+    RiPP Recognition Elements (RREs) are protein domains of ~100
+    amino acids in RiPP modifying enzymes that are vital for RiPP
+    precursor peptide recognition. They are found in roughly half
+    of all bacterial RiPP classes.
+    RREFinder is a tool for the recognition of these domains.
+    RREFinder has two modes for RRE detection: precision
+    mode, which detects RREs of known RiPP classes with high
+    confidence using a library of pHMMs, and exploratory mode,
+    which uses HHPred to detect RREs. Exploratory mode detects
+    more false positives, but is capable of detecting RREs for
+    which no specific pHMM model has been designed.
+
+    Only precision mode has been implemented here.
+
+    For more details, see:
+    https://www.biorxiv.org/content/10.1101/2020.03.14.992123v1
+    and
+    https://github.com/Alexamk/RREFinder
 """
 
-# start with standard library imports
 import logging
+import os
+
 from typing import Any, Dict, List, Optional
 
-# then any imports from external modules, e.g. biopython, if relevant
-
-# then any imports from antismash
 from antismash.common.secmet import Record
 from antismash.config import ConfigType, get_config
 from antismash.config.args import ModuleArgs
@@ -22,16 +37,8 @@ from antismash.common import path
 from .html_output import generate_html, will_handle
 from .rrefinder import run_rrefinder, RREFinderResults
 
-# then any local file imports, e.g. from .somefile import..., if relevant
-
 NAME = "rrefinder"
 SHORT_DESCRIPTION = "Module for the pHMM-based detection of RiPP Recognition Elements (RREs)"
-
-
-# define a results class, this is important as adding information to the record
-# during analysis will cause issues
-# for detailed examples, see any of the other analysis modules' implementations
-
 
 def get_arguments() -> ModuleArgs:
     """ Builds any commandline argument constructs that may be required
@@ -39,20 +46,13 @@ def get_arguments() -> ModuleArgs:
         Returns:
             an empty or populated ModuleArgs instance
     """
-    # construct the argument group, with section and prefix
-    # the prefix will be enforced for all command line options for the module
-    args = ModuleArgs('Additional analysis', 'rre')
 
-    # an example toggle to turn on your analysis, if not set to always be enabled
-    # can also be used to turn on/off extra features of your analysis
+    args = ModuleArgs('Additional analysis', 'rre')
     args.add_analysis_toggle('run',     # the option as it appears on the command line
                              dest='run',  # the storage location in the antismash Config object
                              default=False,             # disabled by default
                              action='store_true',       # enabled if --template-analysis is given on the commandline
-                             # and finally, text to show when the user runs with --help
                              help="Run RREFinder precision mode on all RiPP gene clusters.")
-
-    # an example option setting a specific value
     args.add_option('cutoff',     # the option as it appears on the command line
                     dest='cutoff',  # as it appears in the antismash Config object
                     type=float,              # the type of the option (int, str, float, ...)
@@ -63,8 +63,6 @@ def get_arguments() -> ModuleArgs:
                     type=int,
                     default=50,
                     help='Minimum amino acid length of RRE domains.')
-    # more complicated options are possible, for further information see antismash.config.args,
-    # look at how other modules construct arguments, or ask for help
     return args
 
 
@@ -78,8 +76,6 @@ def check_options(options: ConfigType) -> List[str]:
             a list of strings, each string being an issue with the given options
     """
     issues = []
-    # test the options used in get_arguments here, if any
-    # for example, enforcing that values are within a certain range
     if options.rre_cutoff <= 0:
         issues.append("Supplied RREFinder cutoff is negative: %s" % options.rre_cutoff)
     return issues
@@ -94,23 +90,28 @@ def check_prereqs(options: ConfigType) -> List[str]:
         Returns:
             a list of strings, each string being an issue with prerequisites
     """
-    # behaves similarly to check_options(), though checking for built databases,
-    # that external programs are available, and so on
-    # see antismash.detection.hmm_detection for an example of these
-    
-    hmm_database = path.get_full_path(__file__, 'data', 'RREFam.hmm')
-    hmm_present = ensure_database_pressed(hmm_database, return_not_raise=True)
-    # Currently the only error
-    
-    # if there are no external prerequisites, this can just return an empty list
-    return hmm_present
+    # Currently the only requirement is that the hmm_database is present and pressed
+    failure_messages = []
+    failure_messages.extend(prepare_data(logging_only=True))
+    return failure_messages
+
+
+def prepare_data(logging_only: bool = False) -> List[str]:
+    """ Ensures packaged data is fully prepared
+
+        Arguments:
+            logging_only: whether to return error messages instead of raising exceptions
+
+        Returns:
+            a list of error messages (only if logging_only is True)
+    """
+    database = path.get_full_path(__file__, 'data', 'RREFam.hmm')
+    return ensure_database_pressed(database, return_not_raise=logging_only)
 
 
 def is_enabled(options: ConfigType) -> bool:
     """ Returns True if the module is enabled with the options provided
     """
-    # the logic here depends on which command options you've created
-    # using the example above, this is as simple as returning the toggle
     return options.rre_run
 
 
@@ -148,8 +149,6 @@ def run_on_record(record: Record, results: RREFinderResults, options: ConfigType
     if isinstance(results, RREFinderResults) and results.record_id == record.id:
         return results
     # otherwise run the actual analysis and generate a results instance with your analysis results
-    results = run_rrefinder(record, options.rre_cutoff, options.rre_min_length)
-    
-    
-    # and return it
+    database = path.get_full_path(__file__, 'data', 'RREFam.hmm')
+    results = run_rrefinder(record, options.rre_cutoff, options.rre_min_length, database)
     return results
