@@ -270,7 +270,7 @@ class TestRREFinder(unittest.TestCase):
     @patch('antismash.modules.rrefinder.rrefinder.run_hmmer_copy')
     def test_run_rrefinder(self, mocked_function):
         mocked_function.return_value = self.hmm_res
-        res_object = run_rrefinder(self.mock_record, self.bitscore_cutoff, self.min_length)
+        res_object = run_rrefinder(self.mock_record, self.bitscore_cutoff, self.min_length, self.database)
         assert res_object.record_id == self.record_id
         assert res_object.hits_per_protocluster == self.filtered_hits_per_protocluster
         assert res_object.hit_info == self.filtered_hit_info
