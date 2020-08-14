@@ -162,12 +162,11 @@ def check_hmm_hit(hit: Dict[str, Any], min_length: int, bitscore_cutoff: float) 
     return (hit['protein_end'] - hit['protein_start']) >= min_length and (hit['score'] >= bitscore_cutoff)
     # Locations come from BioPython's HSPs, so they are pythonic (zero-based, half-open)
 
-def run_rrefinder(record: Record, bitscore_cutoff: float, min_length: int) -> RREFinderResults:
+def run_rrefinder(record: Record, bitscore_cutoff: float, min_length: int, database: str) -> RREFinderResults:
     # Gather all RRE candidates
     candidates_per_protocluster, cds_info = gather_rre_candidates(record)
     # Run hmmscan per protocluster and gather the hits
-    hmm_database = path.get_full_path(__file__, 'data', 'RREFam.hmm')
-    hmm_results = run_hmmer_copy(record, cds_info.values(), max_evalue=1, min_score=bitscore_cutoff, database=hmm_database, tool='rrefinder')
+    hmm_results = run_hmmer_copy(record, cds_info.values(), max_evalue=1, min_score=bitscore_cutoff, database=database, tool='rrefinder')
     # Extract the RRE hits
     hit_info = extract_rre_hits(hmm_results)
     # Filter the hits
