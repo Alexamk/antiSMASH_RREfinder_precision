@@ -1,31 +1,31 @@
 import logging
 from collections import defaultdict
 
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 
-from antismash.common.secmet import Record
-from antismash.common.module_results import ModuleResults
 from antismash.config import ConfigType, get_config
 
-from antismash.common.hmmer import run_hmmer_copy, HmmerResults
 from antismash.common import path
-
-from antismash.common.secmet import Region
-from antismash.common.secmet.features import Domain, Feature, FeatureLocation, RRE
-
+from antismash.common.hmmer import run_hmmer_copy, HmmerResults
+from antismash.common.module_results import ModuleResults
+from antismash.common.secmet import Record, Region
+from antismash.common.secmet.features import CDSFeature, FeatureLocation, RRE
 from antismash.common.secmet.locations import location_from_string
 
 class RREFinderResults(ModuleResults):
     """ Results class for the RREFinder analysis"""
     schema_version = 1  # when the data format in the results changes, this needs to be incremented
 
-    def __init__(self, record_id: str, bitscore_cutoff: float, min_length: int, hits_per_protocluster: Dict[int, Dict[str, List[Dict[str, Any]]]]) -> None:
+    def __init__(self, record_id: str, bitscore_cutoff: float, min_length: int, hits_per_protocluster: Dict[int, List[str]],
+                 hit_info: Dict[str, List[Dict[str, Any]]]) -> None:
         super().__init__(record_id)
-        # The cutoff used for hmmscan
+        # The cutoffs used for hmmscan
         self.bitscore_cutoff = bitscore_cutoff
         self.min_length = min_length
-        # All the hits per locus_tag, per protocluster ID
+        # All the locus tags that are an RRE hit per protocluster
         self.hits_per_protocluster = hits_per_protocluster
+        # All the hit info per locus tag
+        self.hit_info = hit_info
         self.features = [] # type: List[Feature] # features created for RREs
         self.tool = 'rrefinder'
         self.database = 'RREFam.hmm'
@@ -33,30 +33,26 @@ class RREFinderResults(ModuleResults):
         self.convert_hits_to_features()
 
     def convert_hits_to_features(self) -> None:
-        locus_tags_added = set() # type: Set[str]
+        '''Convert all the hits found to features'''
         domain_counts = defaultdict(int) # type: Dict[str, int]
+        for locus_tag, hits in self.hit_info.items():
+            for hit in hits:
+                location = location_from_string(hit['location'])
+                protein_location = FeatureLocation(hit['protein_start'], hit['protein_end'])
+                rre_feature = RRE(location, hit['description'], protein_location, tool=self.tool,
+                                  locus_tag=locus_tag, domain=hit['domain'])
 
-        for protocluster_number, hits_per_locus_tag in self.hits_per_protocluster.items():
-            for locus_tag, hits in hits_per_locus_tag.items():
-                if locus_tag in locus_tags_added:
-                    continue
-                for hit in hits:
-                    location = location_from_string(hit['location'])
-                    protein_location = FeatureLocation(hit['protein_start'], hit['protein_end'])
-                    rre_feature = RRE(location, hit['description'], protein_location, tool=self.tool,
-                                      locus_tag=locus_tag, domain=hit['domain'])
-                    # Set additional properties
-                    for attr in ['score', 'evalue', 'label', 'translation']:
-                        setattr(rre_feature, attr, hit[attr])
+                # Set additional properties
+                for attr in ['score', 'evalue', 'label', 'translation']:
+                    setattr(rre_feature, attr, hit[attr])
 
-                    rre_feature.database = self.database
-                    rre_feature.detection = self.detection
+                rre_feature.database = self.database
+                rre_feature.detection = self.detection
 
-                    domain_counts[hit['domain']] += 1  # 1-indexed, so increment before use
-                    rre_feature.domain_id = "{}_{}_{:04d}".format(self.tool, rre_feature.locus_tag, domain_counts[hit['domain']])
+                domain_counts[hit['domain']] += 1  # 1-indexed, so increment before use
+                rre_feature.domain_id = "{}_{}_{:04d}".format(self.tool, rre_feature.locus_tag, domain_counts[hit['domain']])
 
-                    self.features.append(rre_feature)
-                locus_tags_added.add(locus_tag)
+                self.features.append(rre_feature)
 
     def add_to_record(self, record: Record) -> None:
         """ Adds the analysis results to the record """
@@ -73,6 +69,7 @@ class RREFinderResults(ModuleResults):
             "schema_version": self.schema_version,
             "bitscore_cutoff": self.bitscore_cutoff,
             "hits_per_protocluster": self.hits_per_protocluster,
+            "hit_info": self.hit_info,
             "min_length": self.min_length,
             "record_id": self.record_id,
         }
@@ -108,8 +105,8 @@ class RREFinderResults(ModuleResults):
             return None
 
         # Refilter the hits (in case the cutoff is now more stringent)
-        filtered_hits = filter_hits(json['hits_per_protocluster'], min_length, bitscore_cutoff)
-        RRE_results = RREFinderResults(record.id, bitscore_cutoff, min_length, filtered_hits)
+        filtered_hit_info, filtered_hits_per_protocluster = filter_hits(json['hit_info'], json['hits_per_protocluster'], min_length, bitscore_cutoff)
+        RRE_results = RREFinderResults(record.id, bitscore_cutoff, min_length, filtered_hits_per_protocluster, filtered_hit_info)
         return RRE_results
 
 def is_ripp(product: str) -> bool:
@@ -118,42 +115,60 @@ def is_ripp(product: str) -> bool:
                       'proteusin','glycocin','bottromycin','microcin']
     return product in ripp_products
     
-def run_hmmscan_rrefinder(record: Record, bitscore_cutoff: float) -> Dict[int, Dict[str, List[Dict[str, Any]]]]:
-    max_evalue = 1 # Mandatory argument for hmmscan, but hits are only filtered on score here
-    hmm_database = path.get_full_path(__file__, 'data', 'RREFam.hmm')
+def gather_rre_candidates(record: Record) -> Tuple[Dict[int, List[str]], Dict[str, CDSFeature]]:
+    '''Gather all RRE candidates that need to be analyzed with hmmscan
+       and all unique candidates (by CDS name) to prevent double analysis
+       and features in the case of overlapping RiPP protoclusters.
+    '''
+    rre_candidates_per_protocluster = defaultdict(list) # type: Dict[int, List[str]]
+    cds_info = defaultdict(CDSFeature) # type: Dict[str, CDSFeature]
     
-    # Scan each CDS in each protocluster
-    # This is somewhat redundant in the case of overlapping RiPP protoclusters,
-    # as some locus_tags may be scanned twice
-
-    hmm_hits = defaultdict(lambda: defaultdict(list)) # type: Dict[int, Dict[str, List[Dict[str, Any]]]]
     for region in record.get_regions():
         for protocluster in region.get_unique_protoclusters():
             if is_ripp(protocluster.product):
                 protocluster_number = protocluster.get_protocluster_number()
-                hmm_result = run_hmmer_copy(record, protocluster.cds_children, max_evalue, bitscore_cutoff, hmm_database, 'rrefinder')
-                for hit in hmm_result.hits:
-                    hmm_hits[protocluster_number][hit['locus_tag']].append(hit)
-    return hmm_hits
+                for cds in protocluster.cds_children:
+                    cds_name = cds.get_name()
+                    rre_candidates_per_protocluster[protocluster_number].append(cds_name)
+                    cds_info[cds_name] = cds
+    return rre_candidates_per_protocluster, cds_info
 
-def filter_hits(hits: Dict[int, Dict[str, List[Dict[str, Any]]]], min_length: int, bitscore_cutoff: float) -> Dict[int, Dict[str, List[Dict[str, Any]]]]:
-    filtered_hits = defaultdict(lambda: defaultdict(list)) # type: Dict[int, Dict[str, List[Dict[str, Any]]]]
-    for protocluster, locus_tags in hits.items():
-        for locus_tag, hits_locus_tag in locus_tags.items():
-            for hit in hits_locus_tag:
+def extract_rre_hits(hmm_result: HmmerResults) -> Dict[str, List[Dict[str, Any]]]:
+    '''Extract the hits per locus_tag from a HmmerResults object'''
+    hit_info = defaultdict(list) # type: Dict[str, List[Dict[str, Any]]]
+    for hit in hmm_result.hits:
+        hit_info[hit['locus_tag']].append(hit)
+    return hit_info
+
+def filter_hits(hit_info: Dict[str, List[Dict[str, Any]]], candidates_per_protocluster: Dict[int, List[str]],
+                min_length: int, bitscore_cutoff: float) -> Tuple[Dict[str, List[Dict[str, Any]]], Dict[int, List[str]]]:
+    '''Filter the hits based on the bitscore and length criteria'''
+    filtered_tags_per_protocluster = defaultdict(list) # type: Dict[List[str]]
+    filtered_hit_info = defaultdict(list) # type: Dict[str, List[Dict[str, Any]]]
+    for protocluster, locus_tags in candidates_per_protocluster.items():
+        for locus_tag in locus_tags:
+            hits = hit_info[locus_tag]
+            for hit in hits:
                 if check_hmm_hit(hit, min_length, bitscore_cutoff):
-                    filtered_hits[protocluster][locus_tag].append(hit)
-    return filtered_hits
+                    filtered_hit_info[locus_tag].append(hit)
+            if filtered_hit_info.get(locus_tag):
+                filtered_tags_per_protocluster[protocluster].append(locus_tag)
+    return filtered_hit_info, filtered_tags_per_protocluster
 
 def check_hmm_hit(hit: Dict[str, Any], min_length: int, bitscore_cutoff: float) -> Dict[str, Any]:
     return (hit['protein_end'] - hit['protein_start']) >= min_length and (hit['score'] >= bitscore_cutoff)
     # Locations come from BioPython's HSPs, so they are pythonic (zero-based, half-open)
 
 def run_rrefinder(record: Record, bitscore_cutoff: float, min_length: int) -> RREFinderResults:
+    # Gather all RRE candidates
+    candidates_per_protocluster, cds_info = gather_rre_candidates(record)
     # Run hmmscan per protocluster and gather the hits
-    hmm_hits = run_hmmscan_rrefinder(record, bitscore_cutoff)
+    hmm_database = path.get_full_path(__file__, 'data', 'RREFam.hmm')
+    hmm_results = run_hmmer_copy(record, cds_info.values(), max_evalue=1, min_score=bitscore_cutoff, database=hmm_database, tool='rrefinder')
+    # Extract the RRE hits
+    hit_info = extract_rre_hits(hmm_results)
     # Filter the hits
-    filtered_hits = filter_hits(hmm_hits, min_length, bitscore_cutoff)
+    filtered_hit_info, filtered_hits_per_protocluster = filter_hits(hit_info, candidates_per_protocluster, min_length, bitscore_cutoff)
     # Convert to RREFinderResults object
-    RRE_results = RREFinderResults(record.id, bitscore_cutoff, min_length, filtered_hits)
+    RRE_results = RREFinderResults(record.id, bitscore_cutoff, min_length, filtered_hits_per_protocluster, filtered_hit_info)
     return RRE_results

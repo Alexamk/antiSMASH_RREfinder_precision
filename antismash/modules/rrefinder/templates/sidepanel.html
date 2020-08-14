@@ -9,7 +9,8 @@
       <dt></dt>
       {% set cluster_nr = cluster.get_protocluster_number() %}
       {% set cluster_hits = results.hits_per_protocluster[cluster_nr] %}
-      {% for locus_tag, gene_hits in cluster_hits.items() %}
+      {% for locus_tag in cluster_hits %}
+        {% set gene_hits = results.hit_info[locus_tag] %}
         <strong>{{locus_tag}}</strong> {{collapser_start(target=locus_tag, level='cds')}}
         {% for hit in gene_hits | sort(attribute='score', reverse=True)  %}
           <dd>RRE type: {{hit['domain']}}</dd>

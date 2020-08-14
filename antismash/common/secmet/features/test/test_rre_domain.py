@@ -47,3 +47,8 @@ class TestRRE(unittest.TestCase):
         assert rre.tool == self.rre.tool
         assert rre.protein_location == self.rre.protein_location
         assert rre.locus_tag == self.rre.locus_tag
+        
+        # Test with extra qualifiers
+        bio = self.rre.to_biopython(qualifiers={'some_qualifier': ['some_value']})
+        assert bio[0].qualifiers.get('some_qualifier')
+        assert bio[0].qualifiers['some_qualifier'][0] == 'some_value'
