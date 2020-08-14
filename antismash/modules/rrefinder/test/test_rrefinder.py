@@ -16,7 +16,7 @@ from antismash.modules.rrefinder.rrefinder import (
     RREFinderResults,
     run_rrefinder,
     )
-    
+
 class TestRREResults(unittest.TestCase):
 
     def setUp(self):
