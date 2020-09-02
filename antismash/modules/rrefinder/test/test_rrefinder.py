@@ -1,7 +1,6 @@
 import unittest
 
 from collections import defaultdict
-from unittest.mock import Mock, patch
 
 from antismash.common.hmmer import HmmerResults
 from antismash.common.secmet.features import RRE, FeatureLocation
@@ -43,10 +42,10 @@ class TestRREResults(unittest.TestCase):
         self.min_length = 50
         self.bitscore_cutoff = 25.0
 
-        self.record = Mock()
+        self.record = unittest.mock.Mock()
         self.record.id = self.record_id = 'test_record'
 
-        self.record2 = Mock()
+        self.record2 = unittest.mock.Mock()
         self.record2.record_id = 'another_record'
 
         self.json_dict = {"schema_version": RREFinderResults.schema_version,
@@ -56,7 +55,7 @@ class TestRREResults(unittest.TestCase):
                           "min_length": self.min_length,
                           "record_id": self.record_id, }
 
-        self.res_object = RREFinderResults(self.record_id, self.bitscore_cutoff, self.min_length, 
+        self.res_object = RREFinderResults(self.record_id, self.bitscore_cutoff, self.min_length,
                                            self.hits_per_protocluster, self.hit_info)
 
     def test_init(self):
@@ -73,7 +72,8 @@ class TestRREResults(unittest.TestCase):
     def test_convert_hits_to_features(self):
         hit_info = self.hit_info.copy()
         _ = hit_info.pop('locus_tag_b')
-        res_object = RREFinderResults(self.record_id, self.bitscore_cutoff, self.min_length, self.hits_per_protocluster, hit_info)
+        res_object = RREFinderResults(self.record_id, self.bitscore_cutoff, self.min_length,
+                                      self.hits_per_protocluster, hit_info)
         assert len(res_object.features) == 1
         feature = res_object.features[0]
         assert isinstance(feature, RRE)
@@ -95,12 +95,12 @@ class TestRREResults(unittest.TestCase):
 
     def test_from_json(self):
         res_object = RREFinderResults.from_json(self.json_dict, self.record, self.min_length, self.bitscore_cutoff)
-        assert self.res_object
-        assert self.res_object.hits_per_protocluster == self.hits_per_protocluster
-        assert self.res_object.hit_info == self.hit_info
-        assert self.res_object.bitscore_cutoff == self.bitscore_cutoff
-        assert self.res_object.min_length == self.min_length
-        assert self.res_object.record_id == self.record_id
+        assert res_object
+        assert res_object.hits_per_protocluster == self.hits_per_protocluster
+        assert res_object.hit_info == self.hit_info
+        assert res_object.bitscore_cutoff == self.bitscore_cutoff
+        assert res_object.min_length == self.min_length
+        assert res_object.record_id == self.record_id
 
         json_dict2 = dict(self.json_dict)
         json_dict2['record_id'] = 'another_record'
@@ -137,7 +137,7 @@ class TestRREResults(unittest.TestCase):
         assert len(res_object3.hits_per_protocluster) == 1
         assert res_object3.hit_info['locus_tag_b'] == [self.hit_b1]
         assert len(res_object3.hit_info) == 1
-        
+
     def test_add_record(self):
         with self.assertRaisesRegex(ValueError, "Record to store in and record analysed don't match"):
             self.res_object.add_to_record(self.record2)
@@ -150,9 +150,9 @@ class TestRREResults(unittest.TestCase):
 class TestRREFinder(unittest.TestCase):
 
     def setUp(self):
-        self.ripps = ['bacteriocin','cyanobactin','lanthipeptide',
-             'lassopeptide','linaridin','thiopeptide','sactipeptide',
-              'proteusin','glycocin','bottromycin','microcin']
+        self.ripps = ['bacteriocin', 'cyanobactin', 'lanthipeptide',
+             'lassopeptide', 'linaridin', 'thiopeptide', 'sactipeptide',
+              'proteusin', 'glycocin', 'bottromycin', 'microcin']
 
         self.hit_a1 = {'locus_tag': 'locus_tag_a', 'location': '[1000:2000]',
                         'label': 'a1_generic_label', 'domain': 'RRE_type_A', 'evalue': 0.1,
@@ -178,7 +178,7 @@ class TestRREFinder(unittest.TestCase):
                         'description': 'description_type_C', 'translation': 'FAKESEQ',
                         'identifier': 'RREFam003',
                       }
-        self.hit_c =  {'locus_tag': 'locus_tag_c', 'location': '[200:400]',
+        self.hit_c = {'locus_tag': 'locus_tag_c', 'location': '[200:400]',
                         'label': 'a_generic_label', 'domain': 'RRE_type_D', 'evalue': 0.2,
                         'protein_start': 0, 'protein_end': 120, 'score': 6.0,
                         'description': 'description_type_D', 'translation': 'FAKESEQ',
@@ -214,13 +214,13 @@ class TestRREFinder(unittest.TestCase):
         # Simple mock record containing a mock region, which contains three mock protoclusters
         # protocluster.cds_children is the same as the protocluster_number, so that results
         # can be retrieved in testing hmmscan
-        region = Mock(name='my_region')
-        record = Mock(name='my_record')
+        region = unittest.mock.Mock(name='my_region')
+        record = unittest.mock.Mock(name='my_record')
         record.id = self.record_id
 
         protoclusters = []
         for protocluster_number in range(1,4):
-            protocluster = Mock(name = 'my_protocluster_%i' %protocluster_number)
+            protocluster = unittest.mock.Mock(name='my_protocluster_%i' %protocluster_number)
             protocluster.get_protocluster_number.return_value = protocluster_number
             if protocluster_number == 3:
                 protocluster.product = 'Not_a_RiPP'
@@ -229,7 +229,7 @@ class TestRREFinder(unittest.TestCase):
                 # mocked protocluster just return the locus tag as cds_children
                 protocluster.cds_children = []
                 for locus_tag in self.candidates_per_protocluster[protocluster_number]:
-                    cds = Mock()
+                    cds = unittest.mock.Mock()
                     cds.get_name.return_value = locus_tag
                     protocluster.cds_children.append(cds)
             protoclusters.append(protocluster)
@@ -255,11 +255,12 @@ class TestRREFinder(unittest.TestCase):
         assert not check_hmm_hit(self.hit_c, self.min_length, self.bitscore_cutoff)
 
     def test_filter_hits(self):
-        filtered_hit_info, filtered_hits_per_protocluster = filter_hits(self.hit_info, self.candidates_per_protocluster, self.min_length, self.bitscore_cutoff)
+        filtered_hit_info, filtered_hits_per_protocluster = filter_hits(self.hit_info, self.candidates_per_protocluster,
+                                                                        self.min_length, self.bitscore_cutoff)
         assert self.filtered_hit_info == filtered_hit_info
         assert self.filtered_hits_per_protocluster == filtered_hits_per_protocluster
         empty_res = filter_hits(self.hit_info, self.candidates_per_protocluster, 1000, 10)
-        assert not(empty_res[0]) and not(empty_res[1]) 
+        assert not(empty_res[0]) and not(empty_res[1])
         unfiltered_res = filter_hits(self.hit_info, self.candidates_per_protocluster, 0, 0)
         assert unfiltered_res[0] == self.hit_info
         assert unfiltered_res[1] == self.candidates_per_protocluster
@@ -274,7 +275,7 @@ class TestRREFinder(unittest.TestCase):
             assert key in cds_info
             assert key == cds_info[key].get_name()
         
-    @patch('antismash.modules.rrefinder.rrefinder.run_hmmer')
+    @unittest.mock.patch('antismash.modules.rrefinder.rrefinder.run_hmmer')
     def test_run_rrefinder(self, mocked_function):
         mocked_function.return_value = self.hmm_res
         res_object = run_rrefinder(self.mock_record, self.bitscore_cutoff, self.min_length, self.database)

@@ -26,7 +26,9 @@ def generate_html(region_layer: RegionLayer, results: RREFinderResults,
 
     side_tooltip = ("RREfinder results sidepanel.")
     template = FileTemplate(path.get_full_path(__file__, "templates", "sidepanel.html"))
-    
-    html.add_sidepanel_section("RREFinder", template.render(results=results, region=region_layer.region_feature, tooltip=side_tooltip), "RREfinder")
+
+    html.add_sidepanel_section("RREFinder", template.render(results=results,
+                                            region=region_layer.region_feature, tooltip=side_tooltip),
+                               "RREfinder")
 
     return html

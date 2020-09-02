@@ -11,8 +11,8 @@ from antismash.common.secmet.features import FeatureLocation, RRE
 class TestRRE(unittest.TestCase):
 
     def setUp(self):
-        self.protein_location = FeatureLocation(1,5)
-        self.location = FeatureLocation(6,10)
+        self.protein_location = FeatureLocation(1, 5)
+        self.location = FeatureLocation(6, 10)
         self.tool = 'rrefinder_test'
         self.domain = 'RRE_type_a'
         self.description = 'This is a test RRE'
@@ -32,16 +32,16 @@ class TestRRE(unittest.TestCase):
 
         # Test wrong description entries
         with self.assertRaises(TypeError):
-            rre = RRE(self.location, 5, self.protein_location, self.identifier,
+            _ = RRE(self.location, 5, self.protein_location, self.identifier,
                       self.tool, self.locus_tag, self.domain)
         with self.assertRaisesRegex(ValueError, "RRE description cannot be empty"):
-            rre = RRE(self.location, '', self.protein_location, self.identifier,
+            _ = RRE(self.location, '', self.protein_location, self.identifier,
                       self.tool, self.locus_tag, self.domain)
         with self.assertRaisesRegex(ValueError, "RREFam identifier cannot be empty"):
-            rre = RRE(self.location, self.description, self.protein_location, '',
+            _ = RRE(self.location, self.description, self.protein_location, '',
                       self.tool, self.locus_tag, self.domain)
         with self.assertRaises(ValueError):
-            rre = RRE(self.location, self.description, self.protein_location, 'not_a_valid_identifier',
+            _ = RRE(self.location, self.description, self.protein_location, 'not_a_valid_identifier',
                       self.tool, self.locus_tag, self.domain)
 
     def test_conversion(self):

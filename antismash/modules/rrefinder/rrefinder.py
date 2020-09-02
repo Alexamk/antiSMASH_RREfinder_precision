@@ -1,17 +1,21 @@
 # License: GNU Affero General Public License v3 or later
 # A copy of GNU AGPL v3 should have been included in this software package in LICENSE.txt.
 
+"""Integration of precision mode of RREFinder
+   for the detection of RiPP Recognition Elements
+   (RREs) in RiPP BGCs
+"""
+
 import logging
+
 from collections import defaultdict
+from typing import Any, Dict, List, Optional, Tuple
 
-from typing import Any, Dict, List, Optional, Set, Tuple
+from antismash.config import ConfigType
 
-from antismash.config import ConfigType, get_config
-
-from antismash.common import path
 from antismash.common.hmmer import run_hmmer, HmmerResults
 from antismash.common.module_results import ModuleResults
-from antismash.common.secmet import Record, Region
+from antismash.common.secmet import Record
 from antismash.common.secmet.features import CDSFeature, FeatureLocation, RRE
 from antismash.common.secmet.locations import location_from_string
 
@@ -19,8 +23,9 @@ class RREFinderResults(ModuleResults):
     """ Results class for the RREFinder analysis"""
     schema_version = 1  # when the data format in the results changes, this needs to be incremented
 
-    def __init__(self, record_id: str, bitscore_cutoff: float, min_length: int, hits_per_protocluster: Dict[int, List[str]],
-                 hit_info: Dict[str, List[Dict[str, Any]]]) -> None:
+    def __init__(self, record_id: str, bitscore_cutoff: float, min_length: int,
+                 hits_per_protocluster: Dict[int, List[str]], hit_info: Dict[str, List[Dict[str, Any]]]
+                 ) -> None:
         super().__init__(record_id)
         # The cutoffs used for hmmscan
         self.bitscore_cutoff = bitscore_cutoff
@@ -53,7 +58,8 @@ class RREFinderResults(ModuleResults):
                 rre_feature.detection = self.detection
 
                 domain_counts[hit['domain']] += 1  # 1-indexed, so increment before use
-                rre_feature.domain_id = "{}_{}_{:04d}".format(self.tool, rre_feature.locus_tag, domain_counts[hit['domain']])
+                rre_feature.domain_id = "{}_{}_{:04d}".format(self.tool, rre_feature.locus_tag,
+                                                              domain_counts[hit['domain']])
 
                 self.features.append(rre_feature)
 
@@ -95,7 +101,7 @@ class RREFinderResults(ModuleResults):
         prev_min_length = json.get("min_length")
         prev_bitscore_cutoff = json.get("bitscore_cutoff")
 
-        if prev_min_length == None or prev_bitscore_cutoff == None:
+        if prev_min_length is None or prev_bitscore_cutoff is None:
             raise ValueError('Invalid RREfinderResults json dictionary')
         assert isinstance(prev_min_length, int) and isinstance(prev_bitscore_cutoff, float)
 
@@ -108,16 +114,20 @@ class RREFinderResults(ModuleResults):
             return None
 
         # Refilter the hits (in case the cutoff is now more stringent)
-        filtered_hit_info, filtered_hits_per_protocluster = filter_hits(json['hit_info'], json['hits_per_protocluster'], min_length, bitscore_cutoff)
+        filtered_hit_info, filtered_hits_per_protocluster = filter_hits(json['hit_info'],
+                                                                            json['hits_per_protocluster'],
+                                                                            min_length, bitscore_cutoff)
         RRE_results = RREFinderResults(record.id, bitscore_cutoff, min_length, filtered_hits_per_protocluster, filtered_hit_info)
         return RRE_results
 
 def is_ripp(product: str) -> bool:
-    ripp_products = ['bacteriocin','cyanobactin','lanthipeptide',
-                     'lassopeptide','linaridin','thiopeptide','sactipeptide',
-                      'proteusin','glycocin','bottromycin','microcin']
+    """ Determines which BGC products are RiPPs
+    """
+    ripp_products = ['bacteriocin', 'cyanobactin', 'lanthipeptide',
+                     'lassopeptide', 'linaridin', 'thiopeptide', 'sactipeptide',
+                      'proteusin', 'glycocin', 'bottromycin', 'microcin']
     return product in ripp_products
-    
+
 def gather_rre_candidates(record: Record) -> Tuple[Dict[int, List[str]], Dict[str, CDSFeature]]:
     '''Gather all RRE candidates that need to be analyzed with hmmscan
        and all unique candidates (by CDS name) to prevent double analysis
@@ -144,7 +154,8 @@ def extract_rre_hits(hmm_result: HmmerResults) -> Dict[str, List[Dict[str, Any]]
     return hit_info
 
 def filter_hits(hit_info: Dict[str, List[Dict[str, Any]]], candidates_per_protocluster: Dict[int, List[str]],
-                min_length: int, bitscore_cutoff: float) -> Tuple[Dict[str, List[Dict[str, Any]]], Dict[int, List[str]]]:
+                min_length: int, bitscore_cutoff: float
+                ) -> Tuple[Dict[str, List[Dict[str, Any]]], Dict[int, List[str]]]:
     '''Filter the hits based on the bitscore and length criteria'''
     filtered_tags_per_protocluster = defaultdict(list) # type: Dict[List[str]]
     filtered_hit_info = defaultdict(list) # type: Dict[str, List[Dict[str, Any]]]
@@ -159,18 +170,25 @@ def filter_hits(hit_info: Dict[str, List[Dict[str, Any]]], candidates_per_protoc
     return filtered_hit_info, filtered_tags_per_protocluster
 
 def check_hmm_hit(hit: Dict[str, Any], min_length: int, bitscore_cutoff: float) -> Dict[str, Any]:
+    """Check if a HMM hit passes the set cutoffs
+    """
     return (hit['protein_end'] - hit['protein_start']) >= min_length and (hit['score'] >= bitscore_cutoff)
     # Locations come from BioPython's HSPs, so they are pythonic (zero-based, half-open)
 
 def run_rrefinder(record: Record, bitscore_cutoff: float, min_length: int, database: str) -> RREFinderResults:
+    """Run RREFinder on a given record
+    """
     # Gather all RRE candidates
     candidates_per_protocluster, cds_info = gather_rre_candidates(record)
     # Run hmmscan per protocluster and gather the hits
-    hmm_results = run_hmmer(record, cds_info.values(), max_evalue=1, min_score=bitscore_cutoff, database=database, tool='rrefinder', use_cut_tc=False)
+    hmm_results = run_hmmer(record, cds_info.values(), max_evalue=1, min_score=bitscore_cutoff,
+                            database=database, tool='rrefinder', use_cut_tc=False)
     # Extract the RRE hits
     hit_info = extract_rre_hits(hmm_results)
     # Filter the hits
-    filtered_hit_info, filtered_hits_per_protocluster = filter_hits(hit_info, candidates_per_protocluster, min_length, bitscore_cutoff)
+    filtered_hit_info, filtered_hits_per_protocluster = filter_hits(hit_info, candidates_per_protocluster,
+                                                                    min_length, bitscore_cutoff)
     # Convert to RREFinderResults object
-    RRE_results = RREFinderResults(record.id, bitscore_cutoff, min_length, filtered_hits_per_protocluster, filtered_hit_info)
+    RRE_results = RREFinderResults(record.id, bitscore_cutoff, min_length, filtered_hits_per_protocluster,
+                                   filtered_hit_info)
     return RRE_results

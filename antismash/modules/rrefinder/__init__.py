@@ -17,7 +17,7 @@
     Only precision mode has been implemented here.
 
     For more details, see:
-    https://www.biorxiv.org/content/10.1101/2020.03.14.992123v1
+    https://msystems.asm.org/content/5/5/e00267-20/article-info
     and
     https://github.com/Alexamk/RREFinder
 """

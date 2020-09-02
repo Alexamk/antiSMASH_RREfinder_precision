@@ -3,8 +3,6 @@
 
 """ A feature to represent a RiPP Recognition Element (RRE) """
 
-import logging
-
 from collections import OrderedDict
 from typing import Any, Dict, List, Optional, Type, TypeVar
 
@@ -29,7 +27,8 @@ class RRE(Domain):
 
         """ Arguments:
                 location: the DNA location of the feature
-                description: a string with a description of the RRE (e.g. 'RRE-containing protein in a pyrroloquinoline cluster')
+                description: a string with a description of the RRE
+                             (e.g. 'RRE-containing protein in a pyrroloquinoline cluster')
                 protein_location: the location within the parent CDS translation
                 identifier: the RREfam identifier (e.g. RREFam005)
                 tool: the name of the tool used to find/create the feature (rrefinder)

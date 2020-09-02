@@ -149,7 +149,7 @@ def run_hmmer(record: Record, features: Iterable[CDSFeature], max_evalue: float,
     hmmscan_results = subprocessing.run_hmmscan(database, query_sequence, opts=opts)
     hits = build_hits(record, hmmscan_results, min_score, max_evalue, database)
     return HmmerResults(record.id, max_evalue, min_score, database, tool, hits)
-    
+
 
 def ensure_database_pressed(filepath: str, return_not_raise: bool = False) -> List[str]:
     """ Ensures that the given HMMer database exists and that the hmmpress
