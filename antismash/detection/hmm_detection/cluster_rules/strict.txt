@@ -24,8 +24,12 @@ RULE T3PKS
 RULE transAT-PKS
     CUTOFF 45  # kirromycin (CP006259) has a range of ~42kb
     NEIGHBOURHOOD 20
-    CONDITIONS cds(ATd and (PKS_KS or ene_KS or mod_KS or hyb_KS or itr_KS or tra_KS))
-               and cds(PKS_AT and not (PKS_KS or ene_KS or mod_KS or hyb_KS or itr_KS or tra_KS))
+    CONDITIONS cds(PKS_AT and not (PKS_KS or ene_KS or mod_KS or hyb_KS or itr_KS or tra_KS))
+               and (
+                cds(ATd and (PKS_KS or ene_KS or mod_KS or hyb_KS or itr_KS or tra_KS))
+                # handle CP001511 5k-30k as per https://doi.org/10.1002/ange.201709056
+                or cds(tra_KS and PP-binding)
+               )
 
 RULE hglE-KS
     COMMENT heterocyst glycolipid synthase like PKS such as KC489223
@@ -74,7 +78,8 @@ RULE thioamide-NRP
     RELATED Chor_lyase
     CUTOFF 20
     NEIGHBOURHOOD 20
-    CONDITIONS ATP-grasp and AMP-binding and PP-binding and DUF98
+    CONDITIONS ATP-grasp and AMP-binding and PP-binding and
+                (DUF98 or Orn_Arg_deC_N or Orn_DAP_Arg_deC)
 
 RULE terpene
     CUTOFF 20
@@ -97,6 +102,13 @@ RULE lipolanthine
     CUTOFF 20
     NEIGHBOURHOOD 10
     CONDITIONS micKC and Flavoprotein
+
+RULE lanthidin
+    COMMENT Glycosylated lanthipeptide/linaridin hybrids like MT210103
+    RELATED Flavoprotein, Glycos_transf_1, Glycos_transf_2
+    CUTOFF 20
+    NEIGHBOURHOOD 20
+    CONDITIONS APH and HopA1
 
 RULE bacteriocin
     CUTOFF 20

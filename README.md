@@ -1,11 +1,6 @@
 antiSMASH - the antibiotics and Secondary Metabolite Analysis SHell
 ===================================================================
 
-This repository is used to port antiSMASH to be compatible with Python 3, along
-with mayor restructuring and code cleanup efforts. It is not feature-compatible
-with previous antiSMASH versions for now, and certainly is not
-production-quality code.
-
 Development & Funding
 ---------------------
 
@@ -39,6 +34,8 @@ There are multiple options on how to get your own copy of antiSMASH up and runni
 See [our install documentation](https://docs.antismash.secondarymetabolites.org/install/)
 for detailed information.
 
+Note: while efforts are made to keep antiSMASH cross-platform, Windows is not
+officially supported.
 
 License
 -------
