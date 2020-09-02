@@ -48,21 +48,21 @@ def get_arguments() -> ModuleArgs:
     """
 
     args = ModuleArgs('Additional analysis', 'rre')
-    args.add_analysis_toggle('run',     # the option as it appears on the command line
-                             dest='run',  # the storage location in the antismash Config object
+    args.add_analysis_toggle('run',
+                             dest='run',
                              default=False,             # disabled by default
-                             action='store_true',       # enabled if --template-analysis is given on the commandline
+                             action='store_true',
                              help="Run RREFinder precision mode on all RiPP gene clusters.")
-    args.add_option('cutoff',     # the option as it appears on the command line
-                    dest='cutoff',  # as it appears in the antismash Config object
-                    type=float,              # the type of the option (int, str, float, ...)
-                    default=25.0,            # the default value of the option
-                    help="Bitscore cutoff for RRE pHMM detection.")
+    args.add_option('cutoff',
+                    dest='cutoff',
+                    type=float,
+                    default=25.0,
+                    help="Bitscore cutoff for RRE pHMM detection (default: 25.0).")
     args.add_option('min_length',
                     dest='min_length',
                     type=int,
                     default=50,
-                    help='Minimum amino acid length of RRE domains.')
+                    help='Minimum amino acid length of RRE domains (default: 50).')
     return args
 
 
