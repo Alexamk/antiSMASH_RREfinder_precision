@@ -267,7 +267,7 @@ class TestRREFinder(unittest.TestCase):
             assert key in cds_info
             assert key == cds_info[key].get_name()
         
-    @patch('antismash.modules.rrefinder.rrefinder.run_hmmer_copy')
+    @patch('antismash.modules.rrefinder.rrefinder.run_hmmer')
     def test_run_rrefinder(self, mocked_function):
         mocked_function.return_value = self.hmm_res
         res_object = run_rrefinder(self.mock_record, self.bitscore_cutoff, self.min_length, self.database)

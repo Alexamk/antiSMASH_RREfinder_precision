@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 from antismash.config import ConfigType, get_config
 
 from antismash.common import path
-from antismash.common.hmmer import run_hmmer_copy, HmmerResults
+from antismash.common.hmmer import run_hmmer, HmmerResults
 from antismash.common.module_results import ModuleResults
 from antismash.common.secmet import Record, Region
 from antismash.common.secmet.features import CDSFeature, FeatureLocation, RRE
@@ -166,7 +166,7 @@ def run_rrefinder(record: Record, bitscore_cutoff: float, min_length: int, datab
     # Gather all RRE candidates
     candidates_per_protocluster, cds_info = gather_rre_candidates(record)
     # Run hmmscan per protocluster and gather the hits
-    hmm_results = run_hmmer_copy(record, cds_info.values(), max_evalue=1, min_score=bitscore_cutoff, database=database, tool='rrefinder')
+    hmm_results = run_hmmer(record, cds_info.values(), max_evalue=1, min_score=bitscore_cutoff, database=database, tool='rrefinder', use_cut_tc=False)
     # Extract the RRE hits
     hit_info = extract_rre_hits(hmm_results)
     # Filter the hits
