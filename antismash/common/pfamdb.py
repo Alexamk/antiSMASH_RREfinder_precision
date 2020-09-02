@@ -101,7 +101,12 @@ def _build_mapping(database: str) -> Dict[str, str]:
         Returns:
             a dictionary mapping NAME field to ACC field
     """
-    logging.debug("Building mapping for PFAM database version %s", get_db_version_from_path(database))
+    database_type = get_database_type(database)
+    if database_type == 'pfam':
+        logging.debug("Building mapping for PFAM database version %s", get_db_version_from_path(database))
+    elif database_type == 'rrefam':
+        logging.debug("Building mapping for RREFAM database")
+
     with open(database) as handle:
         entries = handle.read().split("\n//\n")
     mapping = {}
@@ -111,6 +116,27 @@ def _build_mapping(database: str) -> Dict[str, str]:
         name, acc = [s.split()[1] for s in entry.splitlines()[1:3]]
         mapping[name] = acc
     return mapping
+
+
+def get_database_type(database: str) -> str:
+    """ Determines which type of database is currently being handled
+
+        Currently only distinguishes between RREFam and PFAM databases
+
+        Arguments:
+            database: a path to the database to build a mapping of
+
+        Returns:
+            the database type as a string
+    """
+
+    parts = database.split(os.sep)
+    if 'pfam' in parts:
+        return 'pfam'
+    elif parts[-1].startswith('RREFam'):
+        return 'rrefam'
+    else:
+        raise ValueError("No valid database type detected in database path")
 
 
 def get_pfam_id_from_name(name: str, database: str) -> str:
