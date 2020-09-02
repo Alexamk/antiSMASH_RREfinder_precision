@@ -43,7 +43,7 @@ class RREFinderResults(ModuleResults):
                 location = location_from_string(hit['location'])
                 protein_location = FeatureLocation(hit['protein_start'], hit['protein_end'])
                 rre_feature = RRE(location, hit['description'], protein_location, tool=self.tool,
-                                  locus_tag=locus_tag, domain=hit['domain'])
+                                  identifier=hit['identifier'], locus_tag=locus_tag, domain=hit['domain'])
 
                 # Set additional properties
                 for attr in ['score', 'evalue', 'label', 'translation']:

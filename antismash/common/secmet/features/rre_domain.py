@@ -20,18 +20,18 @@ class RRE(Domain):
     """ A feature representing an RRE within a CDS.
     """
 
-    __slots__ = ['description']
+    __slots__ = ['description', 'identifier']
     FEATURE_TYPE = 'RRE'
 
     def __init__(self, location: Location, description: str, protein_location: Location,
-                 tool: str, locus_tag: str, domain: Optional[str] = None,
+                 identifier: str, tool: str, locus_tag: str, domain: Optional[str] = None,
                  ) -> None:
 
         """ Arguments:
                 location: the DNA location of the feature
                 description: a string with a description of the RRE (e.g. 'RRE-containing protein in a pyrroloquinoline cluster')
                 protein_location: the location within the parent CDS translation
-                # identifier: the RREfam identifier (e.g. RREFam005)
+                identifier: the RREfam identifier (e.g. RREFam005)
                 tool: the name of the tool used to find/create the feature (rrefinder)
                 locus_tag: the name of the parent CDS feature
                 domain: the name for the domain (e.g. Lanthipeptide_RRE)
@@ -44,9 +44,16 @@ class RRE(Domain):
             raise ValueError("RRE description cannot be empty")
         self.description = description
 
+        if not identifier:
+            raise ValueError("RREFam identifier cannot be empty")
+        if not (len(identifier) == 9 and identifier.startswith('RREFam') and identifier[7:].isdecimal()):
+            raise ValueError("invalid RREFam identifier: %s" % identifier)
+        self.identifier = identifier
+
     def to_biopython(self, qualifiers: Dict[str, List[str]] = None) -> List[SeqFeature]:
         mine = OrderedDict()  # type: Dict[str, List[str]]
         mine["description"] = [self.description]
+        mine["identifier"] = [self.identifier]
         if qualifiers:
             mine.update(qualifiers)
         return super().to_biopython(mine)
@@ -66,7 +73,8 @@ class RRE(Domain):
 
         description = leftovers.pop('description')[0]
         locus_tag = leftovers.pop("locus_tag", ["(unknown)"])[0]
-        feature = cls(bio_feature.location, description, protein_location, tool, locus_tag)
+        identifier = leftovers.pop('identifier')[0]
+        feature = cls(bio_feature.location, description, protein_location, identifier, tool, locus_tag)
 
         # grab parent optional qualifiers
         super().from_biopython(bio_feature, feature=feature, leftovers=leftovers, record=record)

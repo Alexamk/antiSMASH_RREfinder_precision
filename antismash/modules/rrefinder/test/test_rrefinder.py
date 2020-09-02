@@ -24,11 +24,13 @@ class TestRREResults(unittest.TestCase):
                         'label': 'a1_generic_label', 'domain': 'RRE_type_A', 'evalue': 0.1,
                         'protein_start': 0, 'protein_end': 50, 'score': 38.0,
                         'description': 'description_type_A', 'translation': 'FAKESEQ',
+                        'identifier': 'RREFam001',
                       }
         self.hit_b1 = {'locus_tag': 'locus_tag_b', 'location': '[500:1500]',
                         'label': 'b1_generic_label', 'domain': 'RRE_type_B', 'evalue': 0.2,
                         'protein_start': 0, 'protein_end': 90, 'score': 25.0,
                         'description': 'description_type_B', 'translation': 'FAKESEQ',
+                        'identifier': 'RREFam002',
                         }
 
         self.hit_info = dict((hit['locus_tag'], [hit]) for hit in [self.hit_a1, self.hit_b1])
@@ -156,26 +158,31 @@ class TestRREFinder(unittest.TestCase):
                         'label': 'a1_generic_label', 'domain': 'RRE_type_A', 'evalue': 0.1,
                         'protein_start': 0, 'protein_end': 50, 'score': 38.0,
                         'description': 'description_type_A', 'translation': 'FAKESEQ',
+                        'identifier': 'RREFam001',
                       }
         self.hit_a2 = {'locus_tag': 'locus_tag_a', 'location': '[1100:2100]',
                         'label': 'a1_generic_label', 'domain': 'RRE_type_A', 'evalue': 0.1,
                         'protein_start': 0, 'protein_end': 40, 'score': 38.0,
                         'description': 'description_type_A', 'translation': 'FAKESEQ',
+                        'identifier': 'RREFam001',
                       }
         self.hit_b1 = {'locus_tag': 'locus_tag_b', 'location': '[500:1500]',
                         'label': 'b1_generic_label', 'domain': 'RRE_type_B', 'evalue': 0.2,
                         'protein_start': 0, 'protein_end': 90, 'score': 25.0,
                         'description': 'description_type_B', 'translation': 'FAKESEQ',
+                        'identifier': 'RREFam002',
                         }
         self.hit_b2 = {'locus_tag': 'locus_tag_b', 'location': '[600:1600]',
                         'label': 'b1_generic_label', 'domain': 'RRE_type_C', 'evalue': 0.2,
                         'protein_start': 14, 'protein_end': 50, 'score': 42.0,
                         'description': 'description_type_C', 'translation': 'FAKESEQ',
+                        'identifier': 'RREFam003',
                       }
         self.hit_c =  {'locus_tag': 'locus_tag_c', 'location': '[200:400]',
                         'label': 'a_generic_label', 'domain': 'RRE_type_D', 'evalue': 0.2,
                         'protein_start': 0, 'protein_end': 120, 'score': 6.0,
                         'description': 'description_type_D', 'translation': 'FAKESEQ',
+                        'identifier': 'RREFam004',
                       }
 
         self.candidates_per_protocluster = defaultdict(list)
