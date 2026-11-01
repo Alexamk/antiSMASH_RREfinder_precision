@@ -31,7 +31,7 @@ install_requires = [
 tests_require = [
     'pytest >= 3.4.0, < 5', # pytest 5 breaks compatibility with coverage
     'coverage',
-    'pylint == 1.8.4', # until pylint handles ignore lines the same way
+    'pylint == 4.0.9', # until pylint handles ignore lines the same way
 ]
 
 
